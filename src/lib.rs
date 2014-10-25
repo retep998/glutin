@@ -308,7 +308,7 @@ impl Window {
     /// Contrary to `wait_events`, this function never blocks.
     #[inline]
     pub fn poll_events(&self) -> PollEventsIterator {
-        PollEventsIterator { data: self.window.poll_events() }
+        PollEventsIterator(self.window.poll_events())
     }
 
     /// Waits for an event, then returns an iterator to all the events that are currently
@@ -318,7 +318,7 @@ impl Window {
     ///  this function will block until there is one.
     #[inline]
     pub fn wait_events(&self) -> WaitEventsIterator {
-        WaitEventsIterator { data: self.window.wait_events() }
+        WaitEventsIterator(self.window.wait_events())
     }
 
     /// Sets the context as the current context.
@@ -380,26 +380,22 @@ impl HeadlessContext {
 /// An iterator for the `poll_events` function.
 // Implementation note: we retreive the list once, then serve each element by one by one.
 // This may change in the future.
-pub struct PollEventsIterator<'a> {
-    data: Vec<Event>,
-}
+pub struct PollEventsIterator<'a>(winimpl::PollEventsIterator<'a>);
 
 impl<'a> Iterator<Event> for PollEventsIterator<'a> {
     fn next(&mut self) -> Option<Event> {
-        self.data.remove(0)
+        self.0.next()
     }
 }
 
 /// An iterator for the `wait_events` function.
 // Implementation note: we retreive the list once, then serve each element by one by one.
 // This may change in the future.
-pub struct WaitEventsIterator<'a> {
-    data: Vec<Event>,
-}
+pub struct WaitEventsIterator<'a>(winimpl::WaitEventsIterator<'a>);
 
 impl<'a> Iterator<Event> for WaitEventsIterator<'a> {
     fn next(&mut self) -> Option<Event> {
-        self.data.remove(0)
+        self.0.next()
     }
 }
 

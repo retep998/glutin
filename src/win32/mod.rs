@@ -160,49 +160,17 @@ impl Window {
 
     /// See the docs in the crate root file.
     // TODO: return iterator
-    pub fn poll_events(&self) -> Vec<Event> {
-        let mut events = Vec::new();
-        loop {
-            match self.events_receiver.try_recv() {
-                Ok(ev) => events.push(ev),
-                Err(_) => break
-            }
+    pub fn poll_events(&self) -> PollEventsIterator {
+        PollEventsIterator {
+            window: self,
         }
-
-        // if one of the received events is `Closed`, setting `is_closed` to true
-        if events.iter().find(|e| match e { &&::Closed => true, _ => false }).is_some() {
-            use std::sync::atomic::Relaxed;
-            self.is_closed.store(true, Relaxed);
-        }
-        
-        events
     }
 
     /// See the docs in the crate root file.
     // TODO: return iterator
-    pub fn wait_events(&self) -> Vec<Event> {
-        match self.events_receiver.recv_opt() {
-            Ok(ev) => {
-                // if the received event is `Closed`, setting `is_closed` to true
-                match ev {
-                    ::Closed => {
-                        use std::sync::atomic::Relaxed;
-                        self.is_closed.store(true, Relaxed);
-                    },
-                    _ => ()
-                };
-
-                // looing for other possible events in the queue
-                let mut result = self.poll_events();
-                result.insert(0, ev);
-                result
-            },
-
-            Err(_) => {
-                use std::sync::atomic::Relaxed;
-                self.is_closed.store(true, Relaxed);
-                vec![]
-            }
+    pub fn wait_events(&self) -> WaitEventsIterator {
+        WaitEventsIterator {
+            window: self,
         }
     }
 
@@ -237,6 +205,46 @@ impl Window {
 
     pub fn platform_display(&self) -> *mut libc::c_void {
         self.window as *mut libc::c_void
+    }
+}
+
+pub struct PollEventsIterator<'a> {
+    window: &'a Window,
+}
+
+impl<'a> Iterator<Event> for PollEventsIterator<'a> {
+    fn next(&mut self) -> Option<Event> {
+        use Closed;
+
+        match self.window.events_receiver.try_recv() {
+            Ok(Closed) => {
+                use std::sync::atomic::Relaxed;
+                self.window.is_closed.store(true, Relaxed);
+                Some(Closed)
+            },
+            Ok(ev) => Some(ev),
+            Err(_) => None
+        }
+    }
+}
+
+pub struct WaitEventsIterator<'a> {
+    window: &'a Window,
+}
+
+impl<'a> Iterator<Event> for WaitEventsIterator<'a> {
+    fn next(&mut self) -> Option<Event> {
+        use Closed;
+
+        match self.window.events_receiver.recv_opt() {
+            Ok(Closed) => {
+                use std::sync::atomic::Relaxed;
+                self.window.is_closed.store(true, Relaxed);
+                Some(Closed)
+            },
+            Ok(ev) => Some(ev),
+            Err(_) => None
+        }
     }
 }
 
